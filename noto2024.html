@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<!-- firstly produced by Hiromu Daimaru on 20 May 2023 -->
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <title>Sharing locations on CS Maps</title>
+        <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+        <link rel="stylesheet" href="src/leaflet.css">
+        <link rel="stylesheet" href="src/css/bootstrap.css">
+        <link rel="stylesheet" href="src/plugins/easy-button.css">
+        <link rel="stylesheet" href="src/plugins/L.Control.Sidebar.css">
+
+        <!-- <script src="src/leaflet-src.js"></script> -->
+        <script src="src/jquery-3.2.0.min.js"></script>
+        <script src="src/plugins/L.Control.Sidebar.js"></script>
+        <script src="src/plugins/easy-button.js"></script>
+        <script src="src/L.TileLayer.BetterWMS.js"></script>
+        <script src="src/proj4.js"></script>
+        <script src="https://code.jquery.com/jquery-2.2.3.min.js"></script>
+        
+        <style>
+            #mapdiv {
+                height:100vh;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="side-bar" class="col-md-3">
+            <button id='btnLocate' class='btn btn-primary btn-block'>Locate</button>
+            <button id='btnHome' class='btn btn-primary btn-block'>Homeへ移動</button>
+            <h4>Zoom Level: <span id='zoom-level'></span></h4>
+            <h4>Map Center: <span id='map-center'></span></h4>
+            <h4>Mouse Location: <span id='mouse-location'></span></h4>
+            <h4>登録座標: <span id='input-corrdinate'></span></h4>
+            <label for="in_loc_name">地点名</label>
+            <input type="text" name="loc_name" size="20" maxlength="30" id="in_loc_name">
+            <h4>地点名を入力して下さい。<span id='input-comment'></span></h4>
+            <h5><span id='url-value'></span></h5>
+            <button type="button" id="btnCopyUrl">Copy</button>
+        </div>
+        <div id="mapdiv" class="col-md-12"></div>
+
+        <!-- 2024年地震で発生した崩壊地のGeoJSONデータを読み込み -->
+        <script src="src/draw_houkai.js"></script>
+        <script src="src/draw_houkai_wjw.js"></script>
+
+        <script>
+            var mymap;
+            // var lyrOSM;
+            var lyrGSI;
+            var lyrCSMap;
+            var lyrGoogleHybrid;
+            var lyrGSI60th;
+            var geol50kLayer;
+            // var detailLayer;
+            // var labelLayer;
+            // var lineLayer;
+            var landslideLayer;
+            var mrkCurrentLocation;
+            var popHome;
+            var ctlZoom;
+            var ctlAttribute;
+            var ctlScale;
+            var ctlSidebar;
+            var ctlEasybutton;
+            var markerName;
+            var ini_x;
+            var ini_y;
+            var ini_z;
+
+            //ホームポジションを能登学舎に設定
+            ini_y = 37.451256;
+            ini_x =  137.358889;
+            //ズームレベルの初期値を13に設定
+            ini_z = 13;
+
+            $(document).ready(function(){
+                mymap = L.map('mapdiv', {center:[ini_y, ini_x], zoom:13, zoomControl:false, attributionControl:false});
+                //lyrOSM = L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png');
+                //地理院地図
+                lyrGSI = L.tileLayer(
+                    "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+                    {   opacity: 0.3,
+                        attribution:
+                    "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>",
+                     }
+                 );
+                lyrBfCsMap = L.tileLayer(
+                    "https://www2.ffpri.go.jp/soilmap/tile/cs_noto/{z}/{x}/{y}.png",
+                    {
+                        minZoom: 8,
+                        maxZoom: 17,
+                        attribution: "森林総合研究所",
+                    }
+                );
+                //高解像度衛星画像
+                lyrGoogleHybrid = L.tileLayer(
+                     "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+                );
+                //1960年代空中写真
+                lyrGSI60th = L.tileLayer(
+                    "https://cyberjapandata.gsi.go.jp/xyz/ort_old10/{z}/{x}/{y}.png",
+                    {
+                        attribution:
+                        "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>",
+                    }
+                );
+
+                //地震後オルソ写真
+                lyrGSI2024ort = L.tileLayer(
+                    "https://cyberjapandata.gsi.go.jp/xyz/20240102noto_0405_0426do/{z}/{x}/{y}.png",
+                    {
+                        attribution:
+                        "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>",
+                    }
+                );
+
+                //豪雨後オルソ写真輪島東部
+                lyrGSI202409orte = L.tileLayer(
+                    "https://cyberjapandata.gsi.go.jp/xyz/20240923rain_wajimatobu_0924do_sokuho/{z}/{x}/{y}.png",
+                    {
+                        attribution:
+                        "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>",
+                    }
+                );
+
+                //豪雨後オルソ写真輪島西部
+                lyrGSI202409ortw = L.tileLayer(
+                    "https://cyberjapandata.gsi.go.jp/xyz/20240923rain_wajimaseibu_0924do_sokuho/{z}/{x}/{y}.png",
+                    {
+                        attribution:
+                        "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>",
+                    }
+                );
+
+                //5万分の1地質図
+                geol50kLayer = L.tileLayer.betterWms('https://gbank.gsj.jp/geonavi/maptile/wmts/1.0.0/G50_10_003004006007suzumisaki-notoiida/default/EPSG900913/{z}/{y}/{x}.png' ,{
+                    layers: 'area',
+                    format: 'image/png',
+                    transparent : true,
+                    opacity: 0.7,
+                    zIndex: 2000,
+                    attribution: '<a href="https://www.gsj.jp/license/index.html" target="_blank">GSJ, AIST</a>'
+                });
+
+                //地すべり地形分布図
+                landslideLayer = L.tileLayer('https://jmapweb3v.bosai.go.jp/map/xyz/landslide/{z}/{x}/{y}.png', {
+                    format: 'image/png',
+                    transparent : true,
+                    opacity: 0.7,
+                    minZoom: 5,
+                    maxZoom: 15,
+                    attribution:  "<a href='http://www.j-shis.bosai.go.jp/JSHIS2/IMAGE/etc/landslide_v3_jp.png' target='_blank'>防災科研</a>"
+                });
+
+                //G空間情報センターの地震後のCS立体図
+                lyrCSMap = L.tileLayer(
+                    // "SuzuNorth17/{z}/{x}/{y}.png",
+                    "https://forestgeo.info/opendata/17_ishikawa/noto/csmap_2024/{z}/{x}/{y}.webp",
+                    {
+                        minZoom: 8,
+                        maxZoom: 17,
+                        attribution: "林野庁",
+                    }
+                ).addTo(mymap);
+
+                objBaseMaps = {
+                //地理院地図: lyrGSI,
+                地震後CS立体図: lyrCSMap,
+                地震前CS立体図: lyrBfCsMap,
+                };               
+
+                objOverlays = {
+                地理院地図: lyrGSI,
+                地震後写真: lyrGSI2024ort,
+                豪雨後写真東: lyrGSI202409orte,
+                豪雨後写真西: lyrGSI202409ortw,
+
+                // 国土地理院60年代写真: lyrGSI60th,
+                // 能登飯田: geol50kLayer,
+                地震崩壊地東部: jsonHoukai,
+                地震崩壊地西部: jsonHoukai_wjw,
+                //豪雨崩壊: json2409houkai,
+                旧地すべり地形: landslideLayer,
+                };
+
+                //mymap.addLayer(lyrCSMap);
+
+                ctlLayers = L.control.layers(objBaseMaps, objOverlays).addTo(mymap);               
+                ctlZoom = L.control.zoom({zoomInText:"+", zoomOutText:"-", position:"bottomright"}).addTo(mymap);
+                
+                ctlAttribute = L.control.attribution({position:'bottomleft'}).addTo(mymap);
+                ctlAttribute.addAttribution('OSM');
+                ctlAttribute.addAttribution('&copy; <a href="http://millermountain.com">Miller Mountain LLC</a>');
+                
+                ctlScale = L.control.scale({position:'bottomleft', metric:false, maxWidth:200}).addTo(mymap);
+                
+                ctlSidebar = L.control.sidebar('side-bar').addTo(mymap);
+                
+                ctlEasybutton = L.easyButton('glyphicon-transfer', function(){
+                   ctlSidebar.toggle(); 
+                }).addTo(mymap);
+
+                popHome = L.popup({maxWidth:200,keepInView:true});
+                popHome.setLatLng([ini_y, ini_x]);
+                popHome.setContent("<h2>珠洲市役所</h2><img src='img/suzu_office.jpg' width='200px'>");
+
+                // var x = parseFloat(getParam("x"));
+                // var y = parseFloat(getParam("y"));
+                // var locName = parseFloat(getParam("p"));
+                // console.log(locName);
+
+                const url = new URL(location.href);
+                // console.log(url);
+                const params = new URLSearchParams(url.search);
+
+                locName = params.get('p');
+                x = parseFloat(params.get('x'));
+                y = parseFloat(params.get('y'));   
+
+                // x, y が数値で有効な範囲の時にURLパラメータからの数値を初期値に設定する
+                if((Number.isFinite(x))&&(x<=180)&&(x>=-180)&&(Number.isFinite(y))&&(y<=90)&&(y>=-90)){
+                    ini_x=x;
+                    ini_y=y;
+                    mymap.setView([ini_y, ini_x], ini_z);
+                    locFlag=L.marker([ini_y, ini_x]).addTo(mymap);
+                    locFlag.bindPopup("<p>" + locName + "</p>").openPopup(); 
+                }
+                else{
+                    mymap.setView([ini_y, ini_x], ini_z); 
+
+                }
+
+                mymap.on('click', function(e){
+                    if (e.originalEvent.shiftKey) {
+                        alert(mymap.getZoom());
+                    } else {                    
+                        $("#input-corrdinate").html(LatLngToArrayString(e.latlng));
+                        myFlag=L.marker(e.latlng).addTo(mymap);
+                        markerName = $("#in_loc_name").val();
+                        if(markerName) {
+                            myFlag.bindPopup("<p>" + markerName + "</p>").openPopup();
+                            $("#url-value").html(setUrlValue(e.latlng, markerName));
+                            $("#input-comment").html('<p>copyボタンでURLをクリップボードにコピーします。</p>');
+                        }
+                    }
+                });
+                
+                mymap.on('contextmenu', function(e) {
+                    var dtCurrentTime = new Date();
+                    L.marker(e.latlng).addTo(mymap).bindPopup(e.latlng.toString()+"<br>"+dtCurrentTime.toString());
+                });
+                
+                mymap.on('keypress', function(e) {
+                    if (e.originalEvent.key=="l") {
+                        mymap.locate();
+                    }
+                });
+                
+                mymap.on('locationfound', function(e) {
+                    console.log(e);
+                    if (mrkCurrentLocation) {
+                        mrkCurrentLocation.remove();
+                    }
+                    mrkCurrentLocation = L.circle(e.latlng, {radius:e.accuracy/2}).addTo(mymap);
+                    mymap.setView(e.latlng, 14);
+                });
+                
+                mymap.on('locationerror', function(e) {
+                    console.log(e);
+                    alert("Location was not found");
+                })
+                
+                mymap.on('zoomend', function(){
+                    $("#zoom-level").html(mymap.getZoom());
+                });
+                
+                mymap.on('moveend', function(){
+                    $("#map-center").html(LatLngToArrayString(mymap.getCenter()));
+                });
+                
+                mymap.on('mousemove', function(e){
+                    $("#mouse-location").html(LatLngToArrayString(e.latlng));
+                });
+                
+                $("#btnLocate").click(function(){
+                    mymap.locate();
+                });
+                
+                $("#btnHome").click(function(){
+                    mymap.setView([37.43684769826554, 137.2606927861479], 16);
+                    mymap.openPopup(popHome);
+                });
+
+                $('#in_loc_name').change(function() {
+                    isChange = true;
+                    $("#input-comment").html('<p>地図上で場所をクリックして下さい。</p>');
+                });
+
+                $("#btnCopyUrl").click(function(){
+                    // コピーする文章の取得
+                    //var text = $('#js-copytext').text();
+                    var text = $('#url-value').text();
+                    // テキストエリアの作成
+                    var $textarea = $('<textarea></textarea>');
+                    // テキストエリアに文章を挿入
+                    $textarea.text(text);
+                    // テキストエリアを挿入
+                    $(this).append($textarea);
+                    // テキストエリアを選択
+                    $textarea.select();
+                    // コピー
+                    document.execCommand('copy');
+                    // テキストエリアの削除
+                    $textarea.remove();
+                    $("#input-comment").html('<p>メールやSNSにペーストして場所を共有できます</p>');
+                 });
+            });
+            
+            function LatLngToArrayString(ll) {
+                // console.log(ll);
+                return "["+ll.lat.toFixed(5)+", "+ll.lng.toFixed(5)+"]";
+            }
+
+            function setUrlValue(ll, name){
+                urlAdress = window.location.href.split('?')[0]
+                //return window.location.href + "?p=" + name + "&y="+ ll.lat.toFixed(5) + "&x=" + ll.lng.toFixed(5);
+                return urlAdress + "?p=" + name + "&y="+ ll.lat.toFixed(5) + "&x=" + ll.lng.toFixed(5);
+            }
+        </script>
+    </body>
+</html>
