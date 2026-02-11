@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>5m地形変化量表示マップ</title>
+  <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js"></script>
+  <script src="src/plugins/leaflet-tilelayer-glue.js"></script>
+  <style>
+    #map {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      right: 0;
+    }
+    .back-link {
+      position: absolute;
+      top: 58px;
+      right: 12px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.9);
+      color: #0b5ed7;
+      padding: 6px 10px;
+      border-radius: 4px;
+      text-decoration: none;
+      font-size: 13px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    .legend {
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+      font-size: 12px;
+      line-height: 18px;
+    }
+    .legend i {
+      width: 18px;
+      height: 18px;
+      float: left;
+      margin-right: 8px;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+
+<body>
+  <a href="index.html" class="back-link">indexへ戻る</a>
+  <div id="map"></div>
+  <script>
+    var map = L.map("map", {
+      zoom: 11,
+      maxZoom: 16,
+      center: [37.38906, 136.90990]
+    });
+
+    // -70～+70m対応のカラーマップ用シェーダー
+    // 青→白→赤 のダイバージングカラーマップ
+    // 西岡他（2015）の標高計算ルールに基づく
+    var colorMapShader = `
+precision mediump float;
+uniform sampler2D image;
+uniform vec2 unit;
+uniform float zoom;
+
+// 西岡他（2015）に基づく標高値計算関数
+float calculateAltitude(vec3 rgb) {
+  float x = rgb.r * 16711680.0 + rgb.g * 65280.0 + rgb.b * 255.0;
+  float u = 0.01; // 標高分解能
+
+  if (x < 8388608.0) {
+    return x * u;
+  } else if (abs(x - 8388608.0) < 1.0) {
+    return -9999.0; // NA値
+  } else if (x > 8388608.0) {
+    return (x - 16777216.0) * u;
+  } else {
+    return -9999.0; // 無効な値
+  }
+}
+
+
+// -70～+70m対応のカラーマップ（青→白→赤）
+vec3 getColor(float altitude) {
+  if (altitude < -10.0) {
+    // -70～-10m:5m毎（12段階）濃青～淡青のグラデーション
+    int level = int((altitude + 70.0) / 5.0);
+    if (level == 0) return vec3(0.00, 0.20, 0.85);   // -70～-65m: 濃青
+    if (level == 1) return vec3(0.05, 0.24, 0.86);   // -65～-60m: 濃青
+    if (level == 2) return vec3(0.10, 0.28, 0.86);   // -60～-55m: 青
+    if (level == 3) return vec3(0.14, 0.31, 0.87);   // -55～-50m: 青
+    if (level == 4) return vec3(0.19, 0.35, 0.88);   // -50～-45m: 青
+    if (level == 5) return vec3(0.24, 0.39, 0.89);   // -45～-40m: 青
+    if (level == 6) return vec3(0.29, 0.43, 0.89);   // -40～-35m: 淡青
+    if (level == 7) return vec3(0.33, 0.47, 0.90);   // -35～-30m: 淡青
+    if (level == 8) return vec3(0.38, 0.50, 0.91);   // -30～-25m: 淡青
+    if (level == 9) return vec3(0.43, 0.54, 0.91);   // -25～-20m: 淡青
+    if (level == 10) return vec3(0.48, 0.58, 0.92);  // -20～-15m: 薄青
+    if (level == 11) return vec3(0.52, 0.62, 0.93);  // -15～-10m: 薄青
+  } else if (altitude <= 0.0) {
+    // -10～0m:1m毎（10段階）薄青～白のグラデーション
+    int level = int(altitude);
+    if (level <= -10) return vec3(0.57, 0.66, 0.94);  // -10以下
+    if (level == -9) return vec3(0.62, 0.70, 0.94);   // -9～-8m
+    if (level == -8) return vec3(0.67, 0.73, 0.95);   // -8～-7m
+    if (level == -7) return vec3(0.71, 0.77, 0.96);   // -7～-6m
+    if (level == -6) return vec3(0.76, 0.81, 0.96);   // -6～-5m
+    if (level == -5) return vec3(0.81, 0.85, 0.97);   // -5～-4m
+    if (level == -4) return vec3(0.86, 0.89, 0.98);   // -4～-3m
+    if (level == -3) return vec3(0.90, 0.92, 0.99);   // -3～-2m
+    if (level == -2) return vec3(0.95, 0.96, 0.99);   // -2～-1m
+    return vec3(1.00, 1.00, 1.00);                    // -1～0m: 白
+  } else if (altitude < 10.0) {
+    // 0～10m:1m毎（10段階）白～淡赤のグラデーション
+    int level = int(altitude);
+    if (level == 0) return vec3(0.99, 0.96, 0.96);   // 0-1m: ほぼ白
+    if (level == 1) return vec3(0.98, 0.92, 0.92);   // 1-2m: 極薄赤
+    if (level == 2) return vec3(0.97, 0.88, 0.88);   // 2-3m: 極薄赤
+    if (level == 3) return vec3(0.96, 0.83, 0.83);   // 3-4m: 薄赤
+    if (level == 4) return vec3(0.95, 0.79, 0.79);   // 4-5m: 薄赤
+    if (level == 5) return vec3(0.94, 0.75, 0.75);   // 5-6m: 淡赤
+    if (level == 6) return vec3(0.93, 0.71, 0.71);   // 6-7m: 淡赤
+    if (level == 7) return vec3(0.92, 0.67, 0.67);   // 7-8m: 淡赤
+    if (level == 8) return vec3(0.91, 0.63, 0.63);   // 8-9m: 赤
+    if (level == 9) return vec3(0.90, 0.58, 0.58);   // 9-10m: 赤
+  } else {
+    // 10m以上は5m毎（14段階）赤～濃赤のグラデーション
+    int level = int((altitude - 10.0) / 5.0);
+    if (level == 0) return vec3(0.89, 0.54, 0.54);    // 10-15m: 赤
+    if (level == 1) return vec3(0.88, 0.50, 0.50);    // 15-20m: 赤
+    if (level == 2) return vec3(0.86, 0.46, 0.46);    // 20-25m: 赤
+    if (level == 3) return vec3(0.85, 0.42, 0.42);    // 25-30m: 濃赤
+    if (level == 4) return vec3(0.84, 0.38, 0.38);    // 30-35m: 濃赤
+    if (level == 5) return vec3(0.83, 0.33, 0.33);    // 35-40m: 濃赤
+    if (level == 6) return vec3(0.82, 0.29, 0.29);    // 40-45m: 暗赤
+    if (level == 7) return vec3(0.81, 0.25, 0.25);    // 45-50m: 暗赤
+    if (level == 8) return vec3(0.80, 0.21, 0.21);    // 50-55m: 暗赤
+    if (level == 9) return vec3(0.79, 0.17, 0.17);    // 55-60m: 暗赤
+    if (level == 10) return vec3(0.78, 0.13, 0.13);   // 60-65m: 最暗赤
+    if (level == 11) return vec3(0.77, 0.08, 0.08);   // 65-70m: 最暗赤
+    if (level == 12) return vec3(0.76, 0.04, 0.04);   // 70-75m: 最暗赤
+    return vec3(0.75, 0.00, 0.00);                    // 75m以上: 最濃赤
+  }
+  return vec3(0.5, 0.5, 0.5);
+}
+
+void main() {
+  vec2 p = vec2(gl_FragCoord.x, 1.0 / unit.y - gl_FragCoord.y);
+
+  // 標高値を計算
+  vec4 pixelColor = texture2D(image, p * unit);
+  float alt = calculateAltitude(pixelColor.rgb);
+
+  // NA値（-9999）の場合は透明
+  if (alt < -9998.0) {
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+    return;
+  }
+
+  // 色を取得
+  vec3 color = getColor(alt);
+
+  // 無効なデータは透明化
+  float alpha = (alt >= -70.0 && alt <= 75.0) ? 1.0 : 0.0;
+
+  gl_FragColor = vec4(color, alpha);
+}
+    `;
+
+    // -50～+55m対応の等高線表示用シェーダー
+    var contourShader = `
+precision mediump float;
+uniform sampler2D image;
+uniform vec2 unit;
+uniform float zoom;
+
+// 西岡他（2015）に基づく標高値計算関数
+float calculateAltitude(vec3 rgb) {
+  float x = rgb.r * 16711680.0 + rgb.g * 65280.0 + rgb.b * 255.0;
+  float u = 0.01; // 標高分解能
+
+  if (x < 8388608.0) {
+    return x * u;
+  } else if (abs(x - 8388608.0) < 1.0) {
+    return -9999.0; // NA値
+  } else if (x > 8388608.0) {
+    return (x - 16777216.0) * u;
+  } else {
+    return -9999.0; // 無効な値
+  }
+}
+
+int getLevel(float altitude) {
+  if (altitude < -10.0) {
+    return int((altitude + 70.0) / 5.0);
+  } else if (altitude < 10.0) {
+    return 12 + int(altitude);
+  } else {
+    return 22 + int((altitude - 10.0) / 5.0);
+  }
+}
+
+vec3 getColor(float altitude) {
+  if (altitude < -10.0) {
+    // -70～-10m:5m毎（12段階）濃青～淡青のグラデーション
+    int level = int((altitude + 70.0) / 5.0);
+    if (level == 0) return vec3(0.00, 0.20, 0.85);   // -70～-65m: 濃青
+    if (level == 1) return vec3(0.05, 0.24, 0.86);   // -65～-60m: 濃青
+    if (level == 2) return vec3(0.10, 0.28, 0.86);   // -60～-55m: 青
+    if (level == 3) return vec3(0.14, 0.31, 0.87);   // -55～-50m: 青
+    if (level == 4) return vec3(0.19, 0.35, 0.88);   // -50～-45m: 青
+    if (level == 5) return vec3(0.24, 0.39, 0.89);   // -45～-40m: 青
+    if (level == 6) return vec3(0.29, 0.43, 0.89);   // -40～-35m: 淡青
+    if (level == 7) return vec3(0.33, 0.47, 0.90);   // -35～-30m: 淡青
+    if (level == 8) return vec3(0.38, 0.50, 0.91);   // -30～-25m: 淡青
+    if (level == 9) return vec3(0.43, 0.54, 0.91);   // -25～-20m: 淡青
+    if (level == 10) return vec3(0.48, 0.58, 0.92);  // -20～-15m: 薄青
+    if (level == 11) return vec3(0.52, 0.62, 0.93);  // -15～-10m: 薄青
+  } else if (altitude <= 0.0) {
+    // -10～0m:1m毎（10段階）薄青～白のグラデーション
+    int level = int(altitude);
+    if (level <= -10) return vec3(0.57, 0.66, 0.94);  // -10以下
+    if (level == -9) return vec3(0.62, 0.70, 0.94);   // -9～-8m
+    if (level == -8) return vec3(0.67, 0.73, 0.95);   // -8～-7m
+    if (level == -7) return vec3(0.71, 0.77, 0.96);   // -7～-6m
+    if (level == -6) return vec3(0.76, 0.81, 0.96);   // -6～-5m
+    if (level == -5) return vec3(0.81, 0.85, 0.97);   // -5～-4m
+    if (level == -4) return vec3(0.86, 0.89, 0.98);   // -4～-3m
+    if (level == -3) return vec3(0.90, 0.92, 0.99);   // -3～-2m
+    if (level == -2) return vec3(0.95, 0.96, 0.99);   // -2～-1m
+    return vec3(1.00, 1.00, 1.00);                    // -1～0m: 白
+  } else if (altitude < 10.0) {
+    // 0～10m:1m毎（10段階）白～淡赤のグラデーション
+    int level = int(altitude);
+    if (level == 0) return vec3(0.99, 0.96, 0.96);   // 0-1m: ほぼ白
+    if (level == 1) return vec3(0.98, 0.92, 0.92);   // 1-2m: 極薄赤
+    if (level == 2) return vec3(0.97, 0.88, 0.88);   // 2-3m: 極薄赤
+    if (level == 3) return vec3(0.96, 0.83, 0.83);   // 3-4m: 薄赤
+    if (level == 4) return vec3(0.95, 0.79, 0.79);   // 4-5m: 薄赤
+    if (level == 5) return vec3(0.94, 0.75, 0.75);   // 5-6m: 淡赤
+    if (level == 6) return vec3(0.93, 0.71, 0.71);   // 6-7m: 淡赤
+    if (level == 7) return vec3(0.92, 0.67, 0.67);   // 7-8m: 淡赤
+    if (level == 8) return vec3(0.91, 0.63, 0.63);   // 8-9m: 赤
+    if (level == 9) return vec3(0.90, 0.58, 0.58);   // 9-10m: 赤
+  } else {
+    // 10m以上は5m毎（14段階）赤～濃赤のグラデーション
+    int level = int((altitude - 10.0) / 5.0);
+    if (level == 0) return vec3(0.89, 0.54, 0.54);    // 10-15m: 赤
+    if (level == 1) return vec3(0.88, 0.50, 0.50);    // 15-20m: 赤
+    if (level == 2) return vec3(0.86, 0.46, 0.46);    // 20-25m: 赤
+    if (level == 3) return vec3(0.85, 0.42, 0.42);    // 25-30m: 濃赤
+    if (level == 4) return vec3(0.84, 0.38, 0.38);    // 30-35m: 濃赤
+    if (level == 5) return vec3(0.83, 0.33, 0.33);    // 35-40m: 濃赤
+    if (level == 6) return vec3(0.82, 0.29, 0.29);    // 40-45m: 暗赤
+    if (level == 7) return vec3(0.81, 0.25, 0.25);    // 45-50m: 暗赤
+    if (level == 8) return vec3(0.80, 0.21, 0.21);    // 50-55m: 暗赤
+    if (level == 9) return vec3(0.79, 0.17, 0.17);    // 55-60m: 暗赤
+    if (level == 10) return vec3(0.78, 0.13, 0.13);   // 60-65m: 最暗赤
+    if (level == 11) return vec3(0.77, 0.08, 0.08);   // 65-70m: 最暗赤
+    if (level == 12) return vec3(0.76, 0.04, 0.04);   // 70-75m: 最暗赤
+    return vec3(0.75, 0.00, 0.00);                    // 75m以上: 最濃赤
+  }
+  return vec3(0.5, 0.5, 0.5);
+}
+
+void main() {
+  vec2 p = vec2(gl_FragCoord.x, 1.0 / unit.y - gl_FragCoord.y);
+
+  // 標高値を計算（複数ポイント）
+  vec4 c1 = texture2D(image, (p + vec2(0.0, 0.0)) * unit);
+  vec4 c2 = texture2D(image, (p + vec2(1.0, 0.0)) * unit);
+  vec4 c3 = texture2D(image, (p + vec2(0.0, 1.0)) * unit);
+  vec4 c4 = texture2D(image, (p + vec2(1.0, 1.0)) * unit);
+
+  float h1 = calculateAltitude(c1.rgb);
+  float h2 = calculateAltitude(c2.rgb);
+  float h3 = calculateAltitude(c3.rgb);
+  float h4 = calculateAltitude(c4.rgb);
+
+  // レベルを計算
+  int level1 = getLevel(h1);
+  int level2 = getLevel(h2);
+  int level3 = getLevel(h3);
+  int level4 = getLevel(h4);
+
+  vec3 baseColor = getColor(h1);
+
+  // 等高線の描画（境界を黒くする）
+  float contourAlpha = (level1 != level2 || level1 != level3 || level1 != level4) ? 0.5 : 0.3;
+
+  gl_FragColor = vec4(baseColor, contourAlpha);
+}
+    `;
+
+    // 背景レイヤーの作成
+    var baseMapLayer = L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png", {
+      attribution: "国土地理院",
+      maxZoom: 18
+    });
+    baseMapLayer.addTo(map);
+
+    // レイヤーグループの作成
+    var baseLayers = {
+      "5m色別": L.tileLayer.glue("https://forestgeo.info/opendata/17_ishikawa/noto/henka_2024/{z}/{x}/{y}.png", {
+        attribution: "Forestry Agency",
+        maxZoom: 16,
+        maxNativeZoom: 14,
+        opacity: 0.5,
+        fragmentShader: colorMapShader
+      }).addTo(map),
+
+      "林野庁・簡易オルソ画像": L.tileLayer("https://forestgeo.info/opendata/17_ishikawa/noto/orthophoto_2024/{z}/{x}/{y}.webp", {
+        attribution: "林野庁",
+        maxZoom: 16,
+        maxNativeZoom: 14
+      }),
+
+      "CSMap": L.tileLayer("https://forestgeo.info/opendata/17_ishikawa/noto/csmap_2024/{z}/{x}/{y}.webp", {
+        attribution: "林野庁",
+        maxZoom: 16,
+        maxNativeZoom: 14
+      })
+    };
+
+    var overlayLayers = {};
+    var layerControl = L.control.layers(baseLayers, overlayLayers).addTo(map);
+
+    // GeoJSONレイヤーの読み込み
+    fetch('src/maff_json/jisuberi.geojson')
+      .then(response => response.json())
+      .then(data => {
+        var jisuberiLayer = L.geoJSON(data, {
+          style: {
+            color: "#8B4513",
+            weight: 2,
+            opacity: 0.8,
+            fillColor: "#8B4513",
+            fillOpacity: 0
+          },
+          onEachFeature: function(feature, layer) {
+            if (feature.properties) {
+              var popupContent = '<div>';
+              for (var key in feature.properties) {
+                popupContent += '<b>' + key + ':</b> ' + feature.properties[key] + '<br>';
+              }
+              popupContent += '</div>';
+              layer.bindPopup(popupContent);
+            }
+          }
+        }).addTo(map);
+
+        // レイヤーコントロールにオーバーレイを追加
+        layerControl.addOverlay(jisuberiLayer, "地すべり");
+      })
+      .catch(err => console.log('jisuberi.geojson load error:', err));
+
+    // houkai.geojsonの読み込み
+    fetch('src/maff_json/houkai.geojson')
+      .then(response => response.json())
+      .then(data => {
+        var houkaiLayer = L.geoJSON(data, {
+          style: {
+            color: "#000000",
+            weight: 2,
+            opacity: 0.8,
+            fillColor: "#000000",
+            fillOpacity: 0
+          },
+          onEachFeature: function(feature, layer) {
+            if (feature.properties) {
+              var popupContent = '<div>';
+              for (var key in feature.properties) {
+                popupContent += '<b>' + key + ':</b> ' + feature.properties[key] + '<br>';
+              }
+              popupContent += '</div>';
+              layer.bindPopup(popupContent);
+            }
+          }
+        }).addTo(map);
+
+        // レイヤーコントロールにオーバーレイを追加
+        layerControl.addOverlay(houkaiLayer, "崩壊");
+      })
+      .catch(err => console.log('houkai.geojson load error:', err));
+
+    // taiseki.geojsonの読み込み
+    fetch('src/maff_json/taiseki.geojson')
+      .then(response => response.json())
+      .then(data => {
+        var taisekinLayer = L.geoJSON(data, {
+          style: {
+            color: "#0000FF",
+            weight: 2,
+            opacity: 0.8,
+            fillColor: "#0000FF",
+            fillOpacity: 0
+          },
+          onEachFeature: function(feature, layer) {
+            if (feature.properties) {
+              var popupContent = '<div>';
+              for (var key in feature.properties) {
+                popupContent += '<b>' + key + ':</b> ' + feature.properties[key] + '<br>';
+              }
+              popupContent += '</div>';
+              layer.bindPopup(popupContent);
+            }
+          }
+        }).addTo(map);
+
+        // レイヤーコントロールにオーバーレイを追加
+        layerControl.addOverlay(taisekinLayer, "堆積域");
+      })
+      .catch(err => console.log('taiseki.geojson load error:', err));
+
+    // 凡例の追加
+    var legend = L.control({ position: 'bottomleft' });
+
+    legend.onAdd = function(map) {
+      var div = L.DomUtil.create('div', 'legend');
+      var labels = [
+        ['-70～-65m', 'rgb(0, 51, 217)'],
+        ['-65～-60m', 'rgb(13, 61, 219)'],
+        ['-60～-55m', 'rgb(26, 71, 219)'],
+        ['-55～-50m', 'rgb(36, 79, 222)'],
+        ['-50～-45m', 'rgb(48, 89, 224)'],
+        ['-45～-40m', 'rgb(61, 99, 227)'],
+        ['-40～-35m', 'rgb(74, 110, 227)'],
+        ['-35～-30m', 'rgb(84, 120, 230)'],
+        ['-30～-25m', 'rgb(97, 128, 232)'],
+        ['-25～-20m', 'rgb(110, 138, 232)'],
+        ['-20～-15m', 'rgb(122, 148, 235)'],
+        ['-15～-10m', 'rgb(133, 158, 237)'],
+        ['-10～-9m', 'rgb(145, 168, 240)'],
+        ['-9～-8m', 'rgb(158, 179, 240)'],
+        ['-8～-7m', 'rgb(171, 186, 242)'],
+        ['-7～-6m', 'rgb(181, 196, 245)'],
+        ['-6～-5m', 'rgb(194, 207, 245)'],
+        ['-5～-4m', 'rgb(207, 217, 247)'],
+        ['-4～-3m', 'rgb(219, 227, 250)'],
+        ['-3～-2m', 'rgb(230, 235, 252)'],
+        ['-2～-1m', 'rgb(242, 245, 252)'],
+        ['-1～0m', 'rgb(255, 255, 255)'],
+        ['0-1m', 'rgb(252, 245, 245)'],
+        ['1-2m', 'rgb(250, 235, 235)'],
+        ['2-3m', 'rgb(247, 224, 224)'],
+        ['3-4m', 'rgb(245, 212, 212)'],
+        ['4-5m', 'rgb(242, 201, 201)'],
+        ['5-6m', 'rgb(240, 191, 191)'],
+        ['6-7m', 'rgb(237, 181, 181)'],
+        ['7-8m', 'rgb(235, 171, 171)'],
+        ['8-9m', 'rgb(232, 161, 161)'],
+        ['9-10m', 'rgb(230, 148, 148)'],
+        ['10-15m', 'rgb(227, 138, 138)'],
+        ['15-20m', 'rgb(224, 128, 128)'],
+        ['20-25m', 'rgb(219, 117, 117)'],
+        ['25-30m', 'rgb(217, 107, 107)'],
+        ['30-35m', 'rgb(214, 97, 97)'],
+        ['35-40m', 'rgb(212, 84, 84)'],
+        ['40-45m', 'rgb(209, 74, 74)'],
+        ['45-50m', 'rgb(207, 64, 64)'],
+        ['50-55m', 'rgb(204, 54, 54)'],
+        ['55-60m', 'rgb(201, 43, 43)'],
+        ['60-65m', 'rgb(199, 33, 33)'],
+        ['65-70m', 'rgb(196, 20, 20)'],
+        ['70m以上', 'rgb(191, 0, 0)']
+      ];
+
+      labels.forEach(function(label) {
+        var item = document.createElement('div');
+        item.innerHTML = '<i style="background:' + label[1] + '"></i> ' + label[0];
+        div.appendChild(item);
+      });
+
+      return div;
+    };
+
+    legend.addTo(map);
+
+    // JavaScript内で標高値を計算する関数
+    function calculateAltitudeJS(r, g, b) {
+      var x = r * 16711680.0 + g * 65280.0 + b * 255.0;
+      var u = 0.01;
+
+      if (x < 8388608.0) {
+        return x * u;
+      } else if (x === 8388608.0) {
+        return -9999.0;
+      } else {
+        return (x - 16777216.0) * u;
+      }
+    }
+
+    // マップクリック時に標高値を取得
+    map.on('click', function(e) {
+      var latlng = e.latlng;
+      var zoom = map.getZoom();
+
+      // Web Mercator投影を使用してタイル座標を計算
+      var earthCircumference = 40075016.686;
+      var x = (latlng.lng + 180) / 360 * Math.pow(2, zoom);
+      var y = (1 - Math.log(Math.tan(latlng.lat * Math.PI / 180) + 1 / Math.cos(latlng.lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom);
+
+      var tileX = Math.floor(x);
+      var tileY = Math.floor(y);
+      var pixelX = Math.floor((x - tileX) * 256);
+      var pixelY = Math.floor((y - tileY) * 256);
+
+      // タイルのURL
+      var tileUrl = "https://forestgeo.info/opendata/17_ishikawa/noto/henka_2024/" + zoom + "/" + tileX + "/" + tileY + ".png";
+
+      // 画像を読み込んでピクセルデータを取得
+      var img = new Image();
+      img.crossOrigin = "anonymous";
+
+      img.onload = function() {
+        var canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+
+        var imageData = ctx.getImageData(pixelX, pixelY, 1, 1);
+        var data = imageData.data;
+
+        // RGB値を0-1の範囲に正規化
+        var r = data[0] / 255.0;
+        var g = data[1] / 255.0;
+        var b = data[2] / 255.0;
+
+        var altitude = calculateAltitudeJS(r, g, b);
+
+        // ポップアップを表示
+        if (altitude === -9999.0) {
+          L.popup()
+            .setLatLng(latlng)
+            .setContent('変化量: NA（データなし）')
+            .openOn(map);
+        } else {
+          L.popup()
+            .setLatLng(latlng)
+            .setContent('変化量: ' + altitude.toFixed(2) + ' m<br/>座標: ' + latlng.lat.toFixed(5) + ', ' + latlng.lng.toFixed(5))
+            .openOn(map);
+        }
+      };
+
+      img.onerror = function() {
+        L.popup()
+          .setLatLng(latlng)
+          .setContent('タイルデータの読み込みに失敗しました')
+          .openOn(map);
+      };
+
+      img.src = tileUrl;
+    });
+  </script>
+</body>
+
+</html>
