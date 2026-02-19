@@ -59,6 +59,8 @@
   <!-- 崩壊地GeoJSONデータの読み込み -->
   <script src="src/draw_houkai.js"></script>
   <script src="src/draw_houkai_wjw.js"></script>
+  <!-- 盛土ポリゴンデータの読み込み -->
+  <script src="src/draw_fill.js"></script>
 
   <script>
     var map = L.map("map", {
@@ -189,7 +191,8 @@
       "地震崩壊地東部": jsonHoukai,
       "地震崩壊地西部": jsonHoukai_wjw,
       "旧地すべり地形": landslideLayer,
-      "林野庁判読崩壊地・亀裂": lyrVectorLs
+      "林野庁判読崩壊地・亀裂": lyrVectorLs,
+      "盛土": lyrFill
     };
 
     L.control.layers(baseMaps, overlayMaps).addTo(map);
