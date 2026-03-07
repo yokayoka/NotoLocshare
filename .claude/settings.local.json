@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git config:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\n5m色別レイヤーのカラースキームを青→白→赤に改善\n\nmaff_elvchange2.html を追加。value=0 付近でプラス・マイナスが\n同系色\\(緑\\)で識別困難だった問題を、ダイバージングカラーマップ\n\\(青→白→赤\\)に変更して解消。\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nindex.htmlの地形変化データリンク先をmaff_elvchange2.htmlに更新\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "Bash(claude mcp:*)"
+    ]
+  }
+}
