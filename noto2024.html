@@ -3,6 +3,7 @@
 <html lang="ja">
     <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Sharing locations on CS Maps</title>
         <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
 
@@ -23,22 +24,72 @@
             #mapdiv {
                 height:100vh;
             }
+            /* サイドバー内のスマホ対応 */
+            #side-bar .sidebar-inner {
+                padding: 8px 4px;
+            }
+            #side-bar label {
+                font-size: 1em;
+                font-weight: bold;
+                margin-top: 8px;
+                display: block;
+            }
+            #side-bar input[type="text"] {
+                width: 100%;
+                box-sizing: border-box;
+                font-size: 1.1em;
+                padding: 8px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                margin-bottom: 4px;
+            }
+            #side-bar h4 {
+                font-size: 0.9em;
+                margin: 6px 0;
+                word-break: break-all;
+            }
+            #side-bar h5 {
+                font-size: 0.82em;
+                word-break: break-all;
+                margin: 4px 0;
+            }
+            #btnCopyUrl {
+                width: 100%;
+                padding: 10px;
+                font-size: 1em;
+                margin-top: 4px;
+                background: #5cb85c;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+            #btnCopyUrl:active {
+                background: #449d44;
+            }
+            /* マウス座標はタッチ端末で不要なため非表示 */
+            @media (pointer: coarse) {
+                #mouse-location-row {
+                    display: none;
+                }
+            }
         </style>
     </head>
     <body>
         <div id="side-bar" class="col-md-3">
             <a href="index.html" class="btn btn-default btn-block">indexへ戻る</a>
-            <button id='btnLocate' class='btn btn-primary btn-block'>Locate</button>
+            <button id='btnLocate' class='btn btn-primary btn-block'>現在地を表示</button>
             <button id='btnHome' class='btn btn-primary btn-block'>Homeへ移動</button>
-            <h4>Zoom Level: <span id='zoom-level'></span></h4>
-            <h4>Map Center: <span id='map-center'></span></h4>
-            <h4>Mouse Location: <span id='mouse-location'></span></h4>
+            <h4>Zoom: <span id='zoom-level'></span></h4>
+            <h4>中心: <span id='map-center'></span></h4>
+            <h4 id="mouse-location-row">マウス位置: <span id='mouse-location'></span></h4>
             <h4>登録座標: <span id='input-corrdinate'></span></h4>
-            <label for="in_loc_name">地点名</label>
-            <input type="text" name="loc_name" size="20" maxlength="30" id="in_loc_name">
-            <h4>地点名を入力して下さい。<span id='input-comment'></span></h4>
+            <hr>
+            <label for="in_loc_name">地点名を入力 → 地図をタップ</label>
+            <input type="text" name="loc_name" maxlength="30" id="in_loc_name" placeholder="例：崩壊地A">
+            <h4><span id='input-comment'></span></h4>
             <h5><span id='url-value'></span></h5>
-            <button type="button" id="btnCopyUrl">Copy</button>
+            <button type="button" id="btnCopyUrl">URLをコピー</button>
             <hr>
             <a href="help_locshare.html" target="_blank" class="btn btn-default btn-block">場所の共有方法を見る</a>
         </div>
