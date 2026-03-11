@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>場所を共有する方法</title>
+    <style>
+        body {
+            font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 24px 20px 48px;
+            color: #333;
+            line-height: 1.7;
+        }
+        h1 {
+            font-size: 1.5em;
+            border-bottom: 3px solid #3388ff;
+            padding-bottom: 8px;
+            margin-bottom: 24px;
+        }
+        h2 {
+            font-size: 1.15em;
+            margin-top: 36px;
+            margin-bottom: 8px;
+            color: #1a5fa8;
+        }
+        .step {
+            background: #f4f8ff;
+            border-left: 4px solid #3388ff;
+            border-radius: 4px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+        }
+        .step-num {
+            display: inline-block;
+            background: #3388ff;
+            color: #fff;
+            font-weight: bold;
+            border-radius: 50%;
+            width: 26px;
+            height: 26px;
+            text-align: center;
+            line-height: 26px;
+            margin-right: 8px;
+            font-size: 0.95em;
+        }
+        .step-title {
+            font-weight: bold;
+            font-size: 1.05em;
+        }
+        .step p {
+            margin: 8px 0 0 34px;
+        }
+        .url-example {
+            background: #eee;
+            border-radius: 4px;
+            padding: 10px 14px;
+            font-family: monospace;
+            font-size: 0.9em;
+            word-break: break-all;
+            margin: 8px 0;
+        }
+        .param-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+        }
+        .param-table th, .param-table td {
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .param-table th {
+            background: #e8f0fe;
+            font-weight: bold;
+        }
+        .note {
+            background: #fff8e1;
+            border-left: 4px solid #ffc107;
+            border-radius: 4px;
+            padding: 10px 14px;
+            margin-top: 24px;
+            font-size: 0.95em;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 32px;
+            color: #3388ff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+<h1>場所を共有する方法</h1>
+
+<p>このマップでは、地図上の任意の地点を選んで<strong>URLリンクを生成</strong>し、メールやSNSで相手に送ることができます。受け取った相手がリンクを開くと、指定した場所にマーカーが表示された状態でマップが開きます。</p>
+
+<h2>操作手順</h2>
+
+<div class="step">
+    <span class="step-num">1</span><span class="step-title">パネルを開く</span>
+    <p>地図左上の <strong>⇌ ボタン</strong> をクリックして左側のパネルを開きます。</p>
+</div>
+
+<div class="step">
+    <span class="step-num">2</span><span class="step-title">地点名を入力する</span>
+    <p>パネル内の <strong>「地点名」欄</strong> に、共有したい場所の名前を入力します（例：「崩壊地A」「調査地点1」など）。</p>
+</div>
+
+<div class="step">
+    <span class="step-num">3</span><span class="step-title">地図上でクリックする</span>
+    <p>地点名を入力した状態で、共有したい場所を<strong>地図上でクリック</strong>します。クリックした位置にマーカーが立ち、パネルにURLが表示されます。</p>
+</div>
+
+<div class="step">
+    <span class="step-num">4</span><span class="step-title">URLをコピーして共有する</span>
+    <p>パネルの <strong>「Copy」ボタン</strong> を押すと、URLがクリップボードにコピーされます。メール・LINE・SNS等に貼り付けて相手に送ってください。</p>
+</div>
+
+<h2>生成されるURLの仕組み</h2>
+
+<p>生成されるURLには、地点の情報がパラメータとして付加されています。</p>
+
+<div class="url-example">
+https://example.com/noto2024.html<strong>?p=崩壊地A&amp;y=37.39720&amp;x=136.90230</strong>
+</div>
+
+<table class="param-table">
+    <tr>
+        <th>パラメータ</th>
+        <th>内容</th>
+        <th>例</th>
+    </tr>
+    <tr>
+        <td><code>p</code></td>
+        <td>地点名（ポップアップに表示）</td>
+        <td><code>崩壊地A</code></td>
+    </tr>
+    <tr>
+        <td><code>y</code></td>
+        <td>緯度</td>
+        <td><code>37.39720</code></td>
+    </tr>
+    <tr>
+        <td><code>x</code></td>
+        <td>経度</td>
+        <td><code>136.90230</code></td>
+    </tr>
+</table>
+
+<h2>リンクを受け取った側の動作</h2>
+
+<p>URLを開くと、<code>y</code>・<code>x</code> で指定した座標にマーカーが自動的に表示され、<code>p</code> で指定した地点名がポップアップで開きます。そのままマップを操作して周辺の地形・崩壊状況などを確認できます。</p>
+
+<div class="note">
+    <strong>メモ：</strong> 地点名を入力せずにクリックした場合はURLが生成されません。必ず先に地点名を入力してからクリックしてください。
+</div>
+
+<a class="back-link" href="noto2024.html">← マップに戻る</a>
+
+</body>
+</html>
