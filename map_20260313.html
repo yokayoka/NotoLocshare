@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地点インデックスマップ 20260313</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        #mapdiv { height: 100vh; }
+    </style>
+</head>
+<body>
+    <div id="mapdiv"></div>
+    <script>
+        var map = L.map('mapdiv', { center: [37.2, 136.92], zoom: 10 });
+
+        L.tileLayer(
+            'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',
+            {
+                attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>",
+                maxZoom: 18
+            }
+        ).addTo(map);
+
+        var locations = [
+            { name: '尊利地町',       y: 37.43048, x: 137.02683 },
+            { name: '大川北',         y: 37.44521, x: 137.05882 },
+            { name: '大川北2',        y: 37.44488, x: 137.05760 },
+            { name: '真喜野スギ林',   y: 37.42665, x: 137.06156 },
+            { name: '舟木谷峠',       y: 37.42489, x: 137.06460 },
+            { name: '町野町鈴屋',     y: 37.42634, x: 137.09331 },
+            { name: '町野町上地',     y: 37.42878, x: 137.09115 },
+            { name: '町野町谷地',     y: 37.43176, x: 137.10611 },
+            { name: '白米',           y: 37.42283, x: 136.99916 },
+            { name: '鳶嶽',           y: 37.41463, x: 136.98019 },
+            { name: '打越',           y: 37.40988, x: 136.96566 },
+            { name: '岡塚東',         y: 37.40171, x: 136.95199 },
+            { name: '田浦南',         y: 37.39834, x: 136.94442 },
+            { name: '天笠山',         y: 37.41849, x: 137.06703 },
+            { name: '皆月北',         y: 37.35666, x: 136.75481 },
+            { name: '少年自然の家',   y: 36.91799, x: 136.88881 },
+            { name: '雨の宮',         y: 36.97582, x: 136.87156 },
+            { name: '鹿磯',           y: 37.29384, x: 136.73288 },
+            { name: '深見',           y: 37.30830, x: 136.72997 },
+            { name: '皆月南',         y: 37.35098, x: 136.75881 },
+            { name: '門前町中和田',   y: 37.29371, x: 136.77630 },
+            { name: '門前町大町',     y: 37.31142, x: 136.77990 },
+            { name: '縄又町黒川',     y: 37.34399, x: 136.84801 },
+        ];
+
+        locations.forEach(function(loc) {
+            var url = 'noto2024.html?p=' + encodeURIComponent(loc.name) + '&y=' + loc.y + '&x=' + loc.x;
+            var marker = L.marker([loc.y, loc.x]).addTo(map);
+            marker.bindPopup('<b>' + loc.name + '</b><br><a href="' + url + '" target="_blank">地図を開く</a>');
+        });
+    </script>
+</body>
+</html>

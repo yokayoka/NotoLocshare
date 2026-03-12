@@ -118,6 +118,7 @@
             var lyrCSMap;
             var lyrGoogleHybrid;
             var lyrGSI60th;
+            var lyrGSI70th;
             var geol50kLayer;
             // var detailLayer;
             // var labelLayer;
@@ -167,6 +168,15 @@
                 //1960年代空中写真
                 lyrGSI60th = L.tileLayer(
                     "https://cyberjapandata.gsi.go.jp/xyz/ort_old10/{z}/{x}/{y}.png",
+                    {
+                        attribution:
+                        "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>",
+                    }
+                );
+
+                //1970年代空中写真
+                lyrGSI70th = L.tileLayer(
+                    "https://cyberjapandata.gsi.go.jp/xyz/gazo1/{z}/{x}/{y}.jpg",
                     {
                         attribution:
                         "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>",
@@ -243,7 +253,8 @@
                 豪雨後写真東: lyrGSI202409orte,
                 豪雨後写真西: lyrGSI202409ortw,
 
-                // 国土地理院60年代写真: lyrGSI60th,
+                国土地理院60年代写真: lyrGSI60th,
+                国土地理院70年代写真: lyrGSI70th,
                 // 能登飯田: geol50kLayer,
                 地震崩壊地東部: jsonHoukai,
                 地震崩壊地西部: jsonHoukai_wjw,
