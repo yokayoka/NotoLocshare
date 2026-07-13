@@ -7,7 +7,30 @@
       "Bash(git push:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nindex.htmlの地形変化データリンク先をmaff_elvchange2.htmlに更新\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git commit:*)",
-      "Bash(claude mcp:*)"
+      "Bash(claude mcp:*)",
+      "Bash(mv \"\\(\\).md\" \"Web出版に3D地図を埋め込む.md\" \"01_Inbox/\")",
+      "Bash(mv \"2025-12-29.md\" \"2026-01-19.md\" \"02_Diary/\")",
+      "Skill(run)",
+      "Bash(npm -v)",
+      "Bash(npm ls *)",
+      "Bash(python -c \"import playwright\")",
+      "Bash(pip show *)",
+      "Bash(npx --yes playwright@1.48.0 --version)",
+      "Bash(npx --yes playwright@1.48.0 install chromium)",
+      "Bash(PW_TEST_HTML_REPORT_OPEN=never node --experimental-vm-modules -e \"require\\('playwright'\\)\")",
+      "Bash(npm init *)",
+      "Bash(npm install *)",
+      "Bash(node verify_jma_radar.js)",
+      "Bash(pkill -f \"http.server 8123\")",
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(node verify_gsi_basemap.js)",
+      "Bash(node verify_jma_legend.js)",
+      "Bash(curl -s \"https://www.jma.go.jp/bosai/jmatile/data/nowc/targetTimes_N1.json\")",
+      "Bash(curl -s \"https://www.jma.go.jp/bosai/jmatile/data/nowc/targetTimes_N2.json\")",
+      "Bash(python *)",
+      "Bash(node verify_jma_forecast.js)",
+      "Bash(node -e ' *)",
+      "Bash(node verify_noto_pages.js)"
     ]
   }
 }

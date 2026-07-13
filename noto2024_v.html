@@ -26,6 +26,21 @@
             #mapdiv {
                 height:100vh;
             }
+            .legend {
+                background: white;
+                padding: 10px;
+                border-radius: 5px;
+                box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+                font-size: 12px;
+                line-height: 18px;
+            }
+            .legend i {
+                width: 18px;
+                height: 18px;
+                float: left;
+                margin-right: 8px;
+                opacity: 0.7;
+            }
         </style>
     </head>
     <body>
@@ -209,11 +224,105 @@
                     }
                 ).addTo(mymap);
 
+                // 気象庁 高解像度降水ナウキャスト（雨雲レーダー）
+                // タイルURLに時刻情報が必要なため、最新時刻をJSONから取得してURLを設定する
+                var lyrJmaRadar = L.tileLayer('', {
+                    opacity: 0.6,
+                    zIndex: 500,
+                    minZoom: 4,
+                    maxZoom: 18,
+                    maxNativeZoom: 10,
+                    attribution: "<a href='https://www.jma.go.jp/bosai/nowc/' target='_blank'>気象庁 高解像度降水ナウキャスト</a>"
+                });
+
+                // 雨雲レーダーの時刻管理(実況＋予報を1本の時系列リストにまとめる)
+                var jmaTimeList = [];         // { basetime, validtime, type: 'obs' | 'fcst' } の配列（古い→新しい→予報の順）
+                var jmaLatestObsIndex = 0;    // 実況データのうち最新のもののインデックス
+                var jmaTimeIndex = 0;         // 現在表示中のインデックス
+                var jmaUserOverride = false;  // ユーザーがスライダーを手動操作したらtrue
+                var jmaTimeSlider = null;
+                var jmaTimeLabel = null;
+
+                function parseJmaTime(t) {
+                    // "20260713191500" -> Dateオブジェクト（JST）
+                    return new Date(
+                        t.substring(0, 4) + '-' + t.substring(4, 6) + '-' + t.substring(6, 8) +
+                        'T' + t.substring(8, 10) + ':' + t.substring(10, 12) + ':' + t.substring(12, 14) + '+09:00'
+                    );
+                }
+
+                function formatJmaTime(t) {
+                    return t.substring(8, 10) + ':' + t.substring(10, 12);
+                }
+
+                function setJmaRadarByIndex(idx) {
+                    if (!jmaTimeList.length) return;
+                    idx = Math.max(0, Math.min(jmaTimeList.length - 1, idx));
+                    jmaTimeIndex = idx;
+
+                    var entry = jmaTimeList[idx];
+                    var url = 'https://www.jma.go.jp/bosai/jmatile/data/nowc/' + entry.basetime +
+                        '/none/' + entry.validtime + '/surf/hrpns/{z}/{x}/{y}.png';
+                    lyrJmaRadar.setUrl(url);
+
+                    if (jmaTimeSlider) {
+                        jmaTimeSlider.max = jmaTimeList.length - 1;
+                        jmaTimeSlider.value = idx;
+                    }
+
+                    if (jmaTimeLabel) {
+                        var diffMin = Math.round(
+                            (parseJmaTime(entry.validtime) - parseJmaTime(jmaTimeList[jmaLatestObsIndex].validtime)) / 60000
+                        );
+                        var label = formatJmaTime(entry.validtime);
+                        if (entry.type === 'obs') {
+                            label += diffMin === 0 ? '（実況）' : '（' + diffMin + '分前・実況）';
+                        } else {
+                            label += '（+' + diffMin + '分予報）';
+                        }
+                        jmaTimeLabel.textContent = label;
+                    }
+                }
+
+                function updateJmaRadar() {
+                    Promise.all([
+                        fetch('https://www.jma.go.jp/bosai/jmatile/data/nowc/targetTimes_N1.json').then(function(r) { return r.json(); }),
+                        fetch('https://www.jma.go.jp/bosai/jmatile/data/nowc/targetTimes_N2.json').then(function(r) { return r.json(); })
+                    ])
+                        .then(function(results) {
+                            // N1: 実況（過去）データの時刻一覧、N2: 予報データの時刻一覧
+                            var obsTimes = results[0]
+                                .filter(function(t) { return t.basetime === t.validtime; })
+                                .slice()
+                                .reverse(); // 古い→新しい順に並べ替え
+                            var fcstTimes = results[1].slice().reverse(); // 近い→遠い予報の順に並べ替え
+
+                            if (!obsTimes.length) return;
+
+                            jmaLatestObsIndex = obsTimes.length - 1;
+
+                            jmaTimeList = obsTimes.map(function(t) {
+                                return { basetime: t.basetime, validtime: t.validtime, type: 'obs' };
+                            }).concat(fcstTimes.map(function(t) {
+                                return { basetime: t.basetime, validtime: t.validtime, type: 'fcst' };
+                            }));
+
+                            // ユーザーがスライダーを操作していなければ、常に最新の実況を表示する
+                            setJmaRadarByIndex(jmaUserOverride ? Math.min(jmaTimeIndex, jmaTimeList.length - 1) : jmaLatestObsIndex);
+                        })
+                        .catch(function(err) {
+                            console.error('雨雲レーダーデータの取得に失敗しました', err);
+                        });
+                }
+
+                updateJmaRadar();
+                setInterval(updateJmaRadar, 5 * 60 * 1000); // 5分ごとに最新の時刻一覧へ更新
+
                 objBaseMaps = {
                 //地理院地図: lyrGSI,
                 地震後CS立体図: lyrCSMap,
                 地震前CS立体図: lyrBfCsMap,
-                };               
+                };
 
                 objOverlays = {
                 地理院地図: lyrGSI,
@@ -228,11 +337,98 @@
                 //豪雨崩壊: json2409houkai,
                 旧地すべり地形: landslideLayer,
                 林野庁判読崩壊地・亀裂: lyrVectorLs,
+                "雨雲レーダー（気象庁）": lyrJmaRadar,
                 };
 
                 //mymap.addLayer(lyrCSMap);
 
-                ctlLayers = L.control.layers(objBaseMaps, objOverlays).addTo(mymap);               
+                ctlLayers = L.control.layers(objBaseMaps, objOverlays).addTo(mymap);
+
+                // 雨雲レーダーの凡例（気象庁の降水強度カラースケール）
+                var jmaRadarLegendLabels = [
+                    ['1〜5 mm/h', '#a0d2ff'],
+                    ['5〜10 mm/h', '#338fff'],
+                    ['10〜20 mm/h', '#faf500'],
+                    ['20〜30 mm/h', '#ff9900'],
+                    ['30〜50 mm/h', '#ff2800'],
+                    ['50〜80 mm/h', '#b40068'],
+                    ['80 mm/h以上', '#720051']
+                ];
+
+                var jmaRadarLegend = L.control({ position: 'bottomright' });
+
+                jmaRadarLegend.onAdd = function(map) {
+                    var div = L.DomUtil.create('div', 'legend');
+                    div.innerHTML = '<div style="font-weight:bold;margin-bottom:4px;">雨雲レーダー（降水強度）</div>';
+
+                    jmaRadarLegendLabels.forEach(function(label) {
+                        var item = document.createElement('div');
+                        item.innerHTML = '<i style="background:' + label[1] + '"></i> ' + label[0];
+                        div.appendChild(item);
+                    });
+
+                    return div;
+                };
+
+                // 雨雲レーダーの時刻スライダー（実況〜予報を切り替える）
+                var jmaTimeControl = L.control({ position: 'topright' });
+
+                jmaTimeControl.onAdd = function(map) {
+                    var div = L.DomUtil.create('div', 'legend');
+                    div.style.width = '230px';
+
+                    var title = document.createElement('div');
+                    title.style.fontWeight = 'bold';
+                    title.style.marginBottom = '4px';
+                    title.textContent = '雨雲レーダー時刻';
+                    div.appendChild(title);
+
+                    jmaTimeLabel = document.createElement('div');
+                    jmaTimeLabel.style.marginBottom = '4px';
+                    div.appendChild(jmaTimeLabel);
+
+                    jmaTimeSlider = document.createElement('input');
+                    jmaTimeSlider.type = 'range';
+                    jmaTimeSlider.min = 0;
+                    jmaTimeSlider.max = jmaTimeList.length ? jmaTimeList.length - 1 : 0;
+                    jmaTimeSlider.value = jmaTimeIndex;
+                    jmaTimeSlider.step = 1;
+                    jmaTimeSlider.style.width = '100%';
+                    div.appendChild(jmaTimeSlider);
+
+                    jmaTimeSlider.addEventListener('input', function() {
+                        jmaUserOverride = true;
+                        setJmaRadarByIndex(parseInt(jmaTimeSlider.value, 10));
+                    });
+
+                    L.DomEvent.disableClickPropagation(div);
+                    L.DomEvent.disableScrollPropagation(div);
+
+                    // コントロール生成時点で最新のデータがあれば即座に反映する
+                    if (jmaTimeList.length) {
+                        setJmaRadarByIndex(jmaTimeIndex);
+                    }
+
+                    return div;
+                };
+
+                // 雨雲レーダーの表示・非表示に連動して凡例・時刻スライダーを切り替える
+                mymap.on('overlayadd', function(e) {
+                    if (e.layer === lyrJmaRadar) {
+                        jmaRadarLegend.addTo(mymap);
+                        jmaTimeControl.addTo(mymap);
+                    }
+                });
+
+                mymap.on('overlayremove', function(e) {
+                    if (e.layer === lyrJmaRadar) {
+                        mymap.removeControl(jmaRadarLegend);
+                        mymap.removeControl(jmaTimeControl);
+                        jmaTimeSlider = null;
+                        jmaTimeLabel = null;
+                    }
+                });
+
                 ctlZoom = L.control.zoom({zoomInText:"+", zoomOutText:"-", position:"bottomright"}).addTo(mymap);
                 
                 ctlAttribute = L.control.attribution({position:'bottomleft'}).addTo(mymap);
