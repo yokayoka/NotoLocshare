@@ -30,7 +30,19 @@
       "Bash(python *)",
       "Bash(node verify_jma_forecast.js)",
       "Bash(node -e ' *)",
-      "Bash(node verify_noto_pages.js)"
+      "Bash(node verify_noto_pages.js)",
+      "Bash(curl *)",
+      "Bash(python3 *)",
+      "Bash(node tilebbox.js)",
+      "Bash(node collect_histogram.js)",
+      "Bash(node compute_quantiles.js)",
+      "Bash(node generate_shader.js)",
+      "Bash(node compute_quantiles_inner.js)",
+      "Bash(node compute_quantiles_1m.js)",
+      "Bash(node generate_hybrid.js)",
+      "Bash(node verify_colormap.js)",
+      "Bash(node generate_bgr.js)",
+      "Bash(node generate_bgyor.js)"
     ]
   }
 }
