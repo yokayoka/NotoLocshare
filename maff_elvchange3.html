@@ -10,6 +10,9 @@
   <script src="https://unpkg.com/leaflet.vectorgrid@1.3.0/dist/Leaflet.VectorGrid.min.js"></script>
   <script src="src/plugins/leaflet-tilelayer-glue.js"></script>
   <script src="src/elvchange_shaders.js"></script>
+  <script src="src/jquery-3.2.0.min.js"></script>
+  <script src="src/proj4.js"></script>
+  <script src="src/L.TileLayer.BetterWMS.js"></script>
   <style>
     #map {
       position: absolute;
@@ -125,6 +128,19 @@
       "https://cyberjapandata.gsi.go.jp/xyz/20240923rain_wajimaseibu_0924do_sokuho/{z}/{x}/{y}.png",
       {
         attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>"
+      }
+    );
+
+    // 5万分の1地質図
+    var geol50kLayer = L.tileLayer.betterWms(
+      "https://gbank.gsj.jp/geonavi/maptile/wmts/1.0.0/G50_10_003004006007suzumisaki-notoiida/default/EPSG900913/{z}/{y}/{x}.png",
+      {
+        layers: "area",
+        format: "image/png",
+        transparent: true,
+        opacity: 0.7,
+        zIndex: 2000,
+        attribution: '<a href="https://www.gsj.jp/license/index.html" target="_blank">GSJ, AIST</a>'
       }
     );
 
@@ -283,6 +299,7 @@
       "豪雨後写真西": lyrGSI202409ortw,
       "地震崩壊地東部": jsonHoukai,
       "地震崩壊地西部": jsonHoukai_wjw,
+      "地質図・能登飯田": geol50kLayer,
       "旧地すべり地形": landslideLayer,
       "林野庁判読崩壊地・亀裂": lyrVectorLs,
       "盛土": lyrFill,
